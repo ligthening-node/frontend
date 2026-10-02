@@ -1,3 +1,16 @@
+### Exact amounts, no floating point
+
+Millisatoshi values are strings and are handled as `bigint`, so nothing is lost beyond 2^53. The range bar is what is
+still on your side as a share of everything the channel can move, so it starts at 100% and falls as payments leave:
+
+```ts
+import { balancePercent } from "@/components/node/liquidity-bar";
+
+balancePercent("17340000", "0");          // 100  new 20,000 sat channel, nothing has moved
+balancePercent("8670000", "8670000");     // 50   half of it has moved to the other side
+balancePercent("0", "17340000");          // 0    fully used: the channel shows "Completed"
+```
+
 # Lightning Tool: web frontend
 
 A Next.js web app for learning and driving the Lightning Network on **regtest**. It has two halves:
@@ -50,8 +63,8 @@ A Next.js web app for learning and driving the Lightning Network on **regtest**.
 | **Confirming 2/6** | The funding transaction needs 6 confirmations. |
 | **Peer offline** | The channel is ready but the peer is not connected. |
 
-The bar's track is the whole channel amount, the fill is what you can send. It grows when sats arrive on your side and
-shrinks when you send them away. When one node's bar goes down after a payment, the other node's bar goes up by the same
+The bar starts at **100%** when a channel is created and falls as payments move sats to the other side. It grows again
+when sats arrive on your side. When one node's bar goes down after a payment, the other node's bar goes up by the same
 amount.
 
 ## Architecture

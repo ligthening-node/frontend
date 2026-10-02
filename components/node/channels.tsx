@@ -4,7 +4,7 @@ import { WaypointsIcon } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 
-import { LiquidityBar } from "@/components/node/liquidity-bar";
+import { LiquidityBar, spendableMsat } from "@/components/node/liquidity-bar";
 import { ApiErrorNotice } from "@/components/node/unreachable";
 import { InfoTip } from "@/components/decoder/info-tip";
 import { Badge } from "@/components/ui/badge";
@@ -313,12 +313,12 @@ function OpenChannelCard({ onOpened, spendableSat }: { onOpened: () => void; spe
 
 // === Channel row
 
-/** True once the whole amount has moved to the other side: nothing is left to send (or to receive). */
+/** True once the whole amount has moved to the other side: nothing spendable is left to send (or to receive). */
 export function isChannelCompleted(channel: ChannelView): boolean {
   if (!channel.is_channel_ready) {
     return false;
   }
-  return BigInt(channel.is_outbound ? channel.outbound_msat : channel.inbound_msat) === BigInt(0);
+  return spendableMsat(channel.is_outbound ? channel.outbound_msat : channel.inbound_msat) === BigInt(0);
 }
 
 export function channelState(channel: ChannelView): string {
@@ -372,11 +372,7 @@ export function ChannelRow({
         <NodeName labels={labels} nodeId={channel.counterparty_node_id} />
         <span className="text-muted-foreground">{channel.is_outbound ? "(you opened it)" : "(they opened it)"}</span>
       </div>
-      <LiquidityBar
-        outboundMsat={channel.outbound_msat}
-        inboundMsat={channel.inbound_msat}
-        capacitySat={channel.capacity_sat}
-      />
+      <LiquidityBar outboundMsat={channel.outbound_msat} inboundMsat={channel.inbound_msat} />
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
         <dt className="text-muted-foreground">Channel id</dt>
         <dd className="flex items-start gap-1">

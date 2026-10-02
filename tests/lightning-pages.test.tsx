@@ -76,16 +76,23 @@ describe("channels", () => {
     expect(localPercent("9007199254740993000", "0")).toBe(100);
   });
 
-  it("fills the range bar with the spendable balance out of the whole channel", () => {
-    expect(balancePercent("750000000", "1000000")).toBe(75);
-    expect(balancePercent("0", "1000000")).toBe(0);
-    expect(balancePercent("990000000", "1000000")).toBe(99);
-    expect(balancePercent("5", "0")).toBe(0);
+  it("starts the range bar at 100% and lowers it as sats move to the other side", () => {
+    // A new 20,000 sat channel: 17,340 sat spendable, nothing receivable yet.
+    expect(balancePercent("17340000", "0")).toBe(100);
+    // Half of the spendable amount has moved over.
+    expect(balancePercent("8670000", "8670000")).toBe(50);
+    expect(balancePercent("4335000", "13005000")).toBe(25);
+    expect(balancePercent("0", "17340000")).toBe(0);
+    expect(balancePercent("0", "0")).toBe(0);
+    // The last few hundred sat of the funder cannot be spent: that counts as fully used.
+    expect(balancePercent("327000", "17013000")).toBe(0);
   });
 
   it("names the channel state", () => {
     expect(channelState(CHANNEL)).toBe("Still open");
     expect(channelState({ ...CHANNEL, outbound_msat: "0" })).toBe("Completed");
+    expect(channelState({ ...CHANNEL, outbound_msat: "327000" })).toBe("Completed");
+    expect(channelState({ ...CHANNEL, outbound_msat: "1500000" })).toBe("Still open");
     expect(channelState({ ...CHANNEL, is_outbound: false, inbound_msat: "0" })).toBe("Completed");
     expect(channelState({ ...CHANNEL, is_outbound: false, outbound_msat: "0" })).toBe("Still open");
     expect(channelState({ ...CHANNEL, is_usable: false, is_channel_ready: false, confirmations: 2 })).toBe(

@@ -12,31 +12,39 @@ export function localPercent(outboundMsat: string, inboundMsat: string): number 
   return Number((outbound * BigInt(100)) / total);
 }
 
-/** Spendable balance as a share of the whole channel in percent (0 to 100), exact with msat strings. */
-export function balancePercent(outboundMsat: string, capacitySat: string): number {
-  const capacityMsat = BigInt(capacitySat) * BigInt(1000);
-  if (capacityMsat === BigInt(0)) {
-    return 0;
-  }
-  const percent = Number((BigInt(outboundMsat) * BigInt(100)) / capacityMsat);
-  return Math.min(100, Math.max(0, percent));
+/**
+ * A channel keeps a few hundred sat of the funder's balance back for fees and can never spend it, so
+ * a side is never exactly empty. Anything below this counts as nothing left.
+ */
+export const UNSPENDABLE_MSAT = BigInt(1_000_000);
+
+/** `msat` as a bigint, with the unspendable leftover rounded down to zero. */
+export function spendableMsat(msat: string): bigint {
+  const value = BigInt(msat);
+  return value < UNSPENDABLE_MSAT ? BigInt(0) : value;
 }
 
 /**
- * A range bar over the whole channel: the track is the channel amount and the fill is what we can
- * send. It grows when sats arrive on our side and shrinks when we send them away. Reserves are held
- * back on both sides, so the fill never quite reaches either end.
+ * What is still on our side, as a share of everything the channel can move, in percent. A new
+ * channel starts at 100 (nothing has moved to the other side) and the figure falls to 0 as payments
+ * leave. Reserves, the opening fee and the unspendable leftover are left out of both sides.
  */
-export function LiquidityBar({
-  outboundMsat,
-  inboundMsat,
-  capacitySat,
-}: {
-  outboundMsat: string;
-  inboundMsat: string;
-  capacitySat: string;
-}): ReactElement {
-  const percent = balancePercent(outboundMsat, capacitySat);
+export function balancePercent(outboundMsat: string, inboundMsat: string): number {
+  const outbound = spendableMsat(outboundMsat);
+  const total = outbound + spendableMsat(inboundMsat);
+  if (total === BigInt(0)) {
+    return 0;
+  }
+  return Number((outbound * BigInt(100)) / total);
+}
+
+/**
+ * A range bar for one channel: full when the channel is new, emptying as sats are sent and filling
+ * on the other node as they arrive. The two bars (one per node) always move in opposite directions.
+ */
+export function LiquidityBar({ outboundMsat, inboundMsat }: { outboundMsat: string; inboundMsat: string }): ReactElement {
+  const percent = balancePercent(outboundMsat, inboundMsat);
+  const totalMsat = (BigInt(outboundMsat) + BigInt(inboundMsat)).toString();
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between text-xs">
@@ -63,7 +71,7 @@ export function LiquidityBar({
       </div>
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>0 sat</span>
-        <span>{formatMsat((BigInt(capacitySat) * BigInt(1000)).toString())}</span>
+        <span>{formatMsat(totalMsat)}</span>
       </div>
       <div className="flex justify-between text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
