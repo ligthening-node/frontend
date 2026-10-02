@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -44,6 +45,24 @@ function largestSendMsat(channels: ChannelView[] | null): string | null {
     .toString();
 }
 
+/**
+ * Why nothing can be paid until a channel exists, or null when at least one channel is usable (or
+ * the channels are not known yet). It names the fix, so it can be shown the moment an invoice is
+ * pasted instead of after the payment fails.
+ */
+export function channelSetupProblem(channels: ChannelView[] | null): string | null {
+  if (channels === null) {
+    return null;
+  }
+  if (channels.length === 0) {
+    return "You have no channel yet. Create a channel first, then paste the invoice again to pay it.";
+  }
+  if (!channels.some((c: ChannelView): boolean => c.is_usable)) {
+    return "None of your channels is usable yet: it is still confirming or the peer is offline. Wait for it, or create a new channel.";
+  }
+  return null;
+}
+
 function asNetwork(value: string | undefined): Network | null {
   return value !== undefined && NETWORKS.has(value) ? (value as Network) : null;
 }
@@ -58,6 +77,7 @@ export function Send(): ReactElement {
   const network = asNetwork(status.data?.network);
   const channels = usePoll(getChannels, CHANNELS_POLL_MS);
   const maxSendMsat = largestSendMsat(channels.data);
+  const channelProblem = channelSetupProblem(channels.data);
 
   const [invoice, setInvoice] = useState<string>("");
   const [expectedPayee, setExpectedPayee] = useState<string>("");
@@ -144,6 +164,18 @@ export function Send(): ReactElement {
 
       {status.error !== null && <ApiErrorNotice error={status.error} />}
 
+      {invoice.trim() !== "" && channelProblem !== null && (
+        <div role="alert" className="flex flex-col gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+          <p className="font-semibold">Create a channel first</p>
+          <p>{channelProblem}</p>
+          <div>
+            <Link href="/channels" className="font-medium underline underline-offset-4">
+              Go to Channels
+            </Link>
+          </div>
+        </div>
+      )}
+
       {shown !== null && shown.result.status === "error" && (
         <DecodeErrorView input={invoice} error={shown.result.error} message={shown.result.message} />
       )}
@@ -155,6 +187,7 @@ export function Send(): ReactElement {
           invoice={invoice}
           expectedPayee={expectedPayee.trim() === "" ? null : expectedPayee.trim()}
           maxSendMsat={maxSendMsat}
+          channelProblem={channelProblem}
           onSent={setSent}
         />
       )}
@@ -192,10 +225,20 @@ interface PayReviewProps {
   expectedPayee: string | null;
   /** Largest single payment the usable channels can carry. Null skips the liquidity check. */
   maxSendMsat?: string | null;
+  /** Set when no channel can be used at all. The page shows the message; this only blocks paying. */
+  channelProblem?: string | null;
   onSent: (sent: SentPayment) => void;
 }
 
-export function PayReview({ decoded, evaluatedAt, invoice, expectedPayee, maxSendMsat = null, onSent }: PayReviewProps): ReactElement {
+export function PayReview({
+  decoded,
+  evaluatedAt,
+  invoice,
+  expectedPayee,
+  maxSendMsat = null,
+  channelProblem = null,
+  onSent,
+}: PayReviewProps): ReactElement {
   const [amountSat, setAmountSat] = useState<string>("");
   const [confirming, setConfirming] = useState<boolean>(false);
   const action = useAction();
@@ -204,8 +247,10 @@ export function PayReview({ decoded, evaluatedAt, invoice, expectedPayee, maxSen
   const chosenMsat = amountless ? satInputToMsat(amountSat) : null;
   const amountMsat = decoded.invoice.amount_msat ?? chosenMsat;
   const amountError = amountless ? satAmountError(amountSat, 1, null) : null;
-  const liquidityError = liquidityProblem(amountMsat, maxSendMsat);
+  // With no usable channel the page already shows "create a channel", so this stays quiet.
+  const liquidityError = channelProblem !== null ? null : liquidityProblem(amountMsat, maxSendMsat);
   const payable =
+    channelProblem === null &&
     decoded.report.verdict === "payable" &&
     amountMsat !== null &&
     amountMsat !== "0" &&
