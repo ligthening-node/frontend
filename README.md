@@ -39,7 +39,7 @@ A Next.js web app for learning and driving the Lightning Network on **regtest**.
 | **Wallet** | Get an on-chain address and send on-chain. |
 | **Payments** | History with status (pending, succeeded, failed), direction and amount. |
 | **Two nodes, two UIs** | Run a second copy of the app against the peer node, so you can be both sides of a payment. |
-| **Light and dark theme**, motion toggle | Respects `prefers-reduced-motion`. |
+| **Light and dark theme** | The background animation respects `prefers-reduced-motion`. |
 
 ### Channel states and the transaction allowance
 
@@ -311,7 +311,7 @@ frontend/
   components/
     decoder/                  anatomy, fields, checks, verdict banner
     node/                     dashboard, channels, channel allowance, send, receive, wallet, payments
-    shell/                    header, theme and motion toggles, background
+    shell/                    header, theme toggle, background
     ui/                       shadcn/ui primitives
   lib/
     decoder.ts                lazy-loads the WebAssembly decoder

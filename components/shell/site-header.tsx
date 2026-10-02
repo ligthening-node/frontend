@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
-import { MotionToggle } from "@/components/shell/motion-toggle";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,7 +96,6 @@ export function SiteHeader({ role }: { role: NodeRole | null }): ReactElement {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           {role !== null && <NodeStatusChip />}
-          <MotionToggle />
           <ThemeToggle />
           <Button
             variant="ghost"
