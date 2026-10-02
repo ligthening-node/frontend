@@ -4,7 +4,7 @@ import { WaypointsIcon } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 
-import { LiquidityBar, spendableMsat } from "@/components/node/liquidity-bar";
+import { ChannelAllowance, spendableMsat } from "@/components/node/channel-allowance";
 import { ApiErrorNotice } from "@/components/node/unreachable";
 import { InfoTip } from "@/components/decoder/info-tip";
 import { Badge } from "@/components/ui/badge";
@@ -384,11 +384,7 @@ export function ChannelRow({
         <NodeName labels={labels} nodeId={channel.counterparty_node_id} />
         <span className="text-muted-foreground">{channel.is_outbound ? "(you opened it)" : "(they opened it)"}</span>
       </div>
-      <LiquidityBar
-        outboundMsat={channel.outbound_msat}
-        inboundMsat={channel.inbound_msat}
-        completed={isChannelCompleted(channel)}
-      />
+      <ChannelAllowance outboundMsat={channel.outbound_msat} inboundMsat={channel.inbound_msat} />
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
         <dt className="text-muted-foreground">Channel id</dt>
         <dd className="flex items-start gap-1">

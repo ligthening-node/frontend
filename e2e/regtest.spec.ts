@@ -120,8 +120,8 @@ test("fund, open a channel, pay in both directions, close", async ({ page }) => 
     )
     .toBe(true);
   await page.reload();
-  await expect(page.getByTestId("channel")).toContainText("Active");
-  await expect(page.getByRole("meter")).toBeVisible();
+  await expect(page.getByTestId("channel")).toContainText("Still open");
+  await expect(page.getByTestId("channel-allowance")).toContainText("Total allowed to transact");
 
   // === Send: we pay the peer's invoice through the decoder firewall
   const theirs = await peerApi<{ invoice: string }>(page, "invoices", {

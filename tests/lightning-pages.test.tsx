@@ -5,7 +5,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ChannelRow, channelState, sortChannels } from "@/components/node/channels";
-import { balancePercent, localPercent } from "@/components/node/liquidity-bar";
+import { spendableMsat, totalAllowedMsat } from "@/components/node/channel-allowance";
 import { describeEvent } from "@/components/node/live-events";
 import { Payments } from "@/components/node/payments";
 import { PayReview } from "@/components/node/send";
@@ -70,31 +70,38 @@ afterEach((): void => {
 // === Channels
 
 describe("channels", () => {
-  it("splits liquidity exactly, even beyond 2^53", () => {
-    expect(localPercent("750000000", "250000000")).toBe(75);
-    expect(localPercent("0", "0")).toBe(0);
-    expect(localPercent("9007199254740993000", "0")).toBe(100);
+  it("adds the two sides exactly, even beyond 2^53", () => {
+    expect(totalAllowedMsat("750000000", "250000000")).toBe(BigInt("1000000000"));
+    expect(totalAllowedMsat("9007199254740993000", "1000")).toBe(BigInt("9007199254740994000"));
+    expect(totalAllowedMsat("0", "0")).toBe(BigInt(0));
   });
 
-  it("starts the range bar at 100% and lowers it as sats move to the other side", () => {
-    // A new 20,000 sat channel: 17,340 sat spendable, nothing receivable yet.
-    expect(balancePercent("17340000", "0")).toBe(100);
-    // Half of the spendable amount has moved over.
-    expect(balancePercent("8670000", "8670000")).toBe(50);
-    expect(balancePercent("4335000", "13005000")).toBe(25);
-    expect(balancePercent("0", "17340000")).toBe(0);
-    expect(balancePercent("0", "0")).toBe(0);
-    // The last few hundred sat of the funder cannot be spent: that counts as fully used.
-    expect(balancePercent("327000", "17013000")).toBe(0);
+  it("counts the unspendable leftover as zero", () => {
+    expect(spendableMsat("17340000")).toBe(BigInt("17340000"));
+    expect(spendableMsat("1000000")).toBe(BigInt("1000000"));
+    expect(spendableMsat("371000")).toBe(BigInt(0));
+    expect(spendableMsat("0")).toBe(BigInt(0));
   });
 
-  it("hides the range bar on a completed channel and keeps it on an open one", () => {
-    const { rerender } = render(<ChannelRow channel={CHANNEL} onClosed={(): void => {}} />);
-    expect(screen.getByRole("meter")).toBeInTheDocument();
-    rerender(<ChannelRow channel={{ ...CHANNEL, outbound_msat: "327000" }} onClosed={(): void => {}} />);
-    expect(screen.getByText("Completed")).toBeInTheDocument();
+  it("shows the total allowed and counts 'left to send' down to 0 sat, with no range bar", () => {
+    const channel = { ...CHANNEL, outbound_msat: "17340000", inbound_msat: "0" };
+    const { rerender } = render(<ChannelRow channel={channel} onClosed={(): void => {}} />);
     expect(screen.queryByRole("meter")).not.toBeInTheDocument();
-    expect(screen.getByText(/Can send 327 sat/)).toBeInTheDocument();
+    const box = screen.getByTestId("channel-allowance");
+    expect(box).toHaveTextContent("Total allowed to transact17,340 sat");
+    expect(box).toHaveTextContent("Left to send17,340 sat");
+    expect(screen.getByText("Still open")).toBeInTheDocument();
+
+    // Half is paid: the total stays, 'left to send' falls.
+    rerender(<ChannelRow channel={{ ...channel, outbound_msat: "8670000", inbound_msat: "8670000" }} onClosed={(): void => {}} />);
+    expect(screen.getByTestId("channel-allowance")).toHaveTextContent("Total allowed to transact17,340 sat");
+    expect(screen.getByTestId("channel-allowance")).toHaveTextContent("Left to send8,670 sat");
+
+    // Used up: only a few hundred unspendable sat remain, shown as 0.
+    rerender(<ChannelRow channel={{ ...channel, outbound_msat: "371000", inbound_msat: "16969000" }} onClosed={(): void => {}} />);
+    expect(screen.getByTestId("channel-allowance")).toHaveTextContent("Left to send0 sat");
+    expect(screen.getByTestId("channel-allowance")).toHaveTextContent("Total allowed to transact17,340 sat");
+    expect(screen.getByText("Completed")).toBeInTheDocument();
   });
 
   it("keeps channels in a fixed order, oldest first, when a new one appears", () => {
@@ -142,9 +149,9 @@ describe("channels", () => {
     });
   });
 
-  it("shows the largest single payment next to the liquidity bar", () => {
+  it("shows the largest single payment next to the allowance", () => {
     render(<ChannelRow channel={CHANNEL} onClosed={(): void => {}} />);
-    expect(screen.getByRole("meter")).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.getByTestId("channel-allowance")).toBeInTheDocument();
     expect(screen.getByText("100,000 sat")).toBeInTheDocument();
   });
 });

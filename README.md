@@ -1,16 +1,3 @@
-### Exact amounts, no floating point
-
-Millisatoshi values are strings and are handled as `bigint`, so nothing is lost beyond 2^53. The range bar is what is
-still on your side as a share of everything the channel can move, so it starts at 100% and falls as payments leave:
-
-```ts
-import { balancePercent } from "@/components/node/liquidity-bar";
-
-balancePercent("17340000", "0");          // 100  new 20,000 sat channel, nothing has moved
-balancePercent("8670000", "8670000");     // 50   half of it has moved to the other side
-balancePercent("0", "17340000");          // 0    fully used: the channel shows "Completed"
-```
-
 # Lightning Tool: web frontend
 
 A Next.js web app for learning and driving the Lightning Network on **regtest**. It has two halves:
@@ -46,7 +33,7 @@ A Next.js web app for learning and driving the Lightning Network on **regtest**.
 |---|---|
 | **In-browser decoder** | Paste a BOLT11 invoice and see a color-coded anatomy, every field explained, and a list of checks with a clear verdict. |
 | **Dashboard** | Node status, on-chain and Lightning balances, and live notifications for payments and channel changes. |
-| **Channels** | Open and close channels. Each channel shows its state and a **range bar** of your balance out of the channel amount. |
+| **Channels** | Open and close channels. Each channel shows its state and the total it is allowed to transact, with how much is left to send and receive. |
 | **Send** | Paste an invoice, review it, then pay. The app explains in words why a payment cannot go out. |
 | **Receive** | Create an invoice with an amount, description and expiry, shown as text and a QR code. |
 | **Wallet** | Get an on-chain address and send on-chain. |
@@ -54,18 +41,22 @@ A Next.js web app for learning and driving the Lightning Network on **regtest**.
 | **Two nodes, two UIs** | Run a second copy of the app against the peer node, so you can be both sides of a payment. |
 | **Light and dark theme**, motion toggle | Respects `prefers-reduced-motion`. |
 
-### Channel states and the range bar
+### Channel states and the transaction allowance
 
 | Badge | Meaning |
 |---|---|
-| **Still open** | The channel is usable and still has balance on the funding side. |
-| **Completed** | The channel's amount has been fully used: nothing is left to send (or, on the receiving side, to receive). |
+| **Still open** | The channel is usable and still has balance to send. |
+| **Completed** | The channel's allowance is used up: nothing spendable is left to send (or, on the receiving side, to receive). |
 | **Confirming 2/6** | The funding transaction needs 6 confirmations. |
 | **Peer offline** | The channel is ready but the peer is not connected. |
 
-The bar starts at **100%** when a channel is created and falls as payments move sats to the other side. It grows again
-when sats arrive on your side. When one node's bar goes down after a payment, the other node's bar goes up by the same
-amount.
+There is no range bar. Each channel shows three numbers instead:
+
+| Number | Meaning |
+|---|---|
+| **Total allowed to transact** | Everything the channel can move: what you can send plus what you can receive. For a 20,000 sat channel that is 17,340 sat, because reserves and the opening fee are held back. It stays the same while payments flow. |
+| **Left to send** | What is still on your side. It counts down sat by sat as you pay and reaches **0 sat** when the channel is used up. The last few hundred sat the funder can never spend show as 0. |
+| **Left to receive** | The same figure for the other side. Both numbers move in opposite directions, so when one node's "left to send" falls, the other node's rises. |
 
 ## Architecture
 
@@ -183,7 +174,7 @@ both nodes, both UIs, funds the wallets and opens channels for you.
 |---|---|
 | `/` | Dashboard: status, balances, live events. |
 | `/decode` | Invoice decoder (works without a node). |
-| `/channels` | Peers, open a channel, channel list with the range bar. |
+| `/channels` | Peers, open a channel, channel list with each channel's transaction allowance. |
 | `/send` | Pay an invoice. |
 | `/receive` | Create an invoice and QR code. |
 | `/wallet` | On-chain address and on-chain send. |
@@ -213,13 +204,15 @@ if (result.status === "ok") {
 
 ### Exact amounts, no floating point
 
-Millisatoshi values are strings and are handled as `bigint`, so nothing is lost beyond 2^53:
+Millisatoshi values are strings and are handled as `bigint`, so nothing is lost beyond 2^53. The allowance is the sum of
+both sides, and the unspendable leftover counts as zero:
 
 ```ts
-import { balancePercent } from "@/components/node/liquidity-bar";
+import { spendableMsat, totalAllowedMsat } from "@/components/node/channel-allowance";
 
-balancePercent("750000000", "1000000");   // 75   (750,000 sat spendable of a 1,000,000 sat channel)
-balancePercent("0", "1000000");           // 0
+totalAllowedMsat("16927000", "413000");   // 17340000n  total allowed: 17,340 sat, fixed for the channel
+spendableMsat("8670000");                 // 8670000n   still left to send
+spendableMsat("371000");                  // 0n         the funder's unspendable leftover: used up
 ```
 
 ### Channel state
@@ -286,7 +279,7 @@ E2E_REGTEST=1 pnpm exec playwright test --project=regtest   # against a running 
 | Suite | Covers |
 |---|---|
 | `tests/wasm.test.ts` | The real `.wasm` decoding spec invoices. |
-| `tests/lightning-pages.test.tsx` | Channel states, range bar, force-close confirmation. |
+| `tests/lightning-pages.test.tsx` | Channel states, the allowance counting down to 0, channel order, force-close confirmation. |
 | `tests/node-pages.test.tsx`, `node-labels`, `node-role` | Node pages and which node is shown. |
 | `tests/proxy.test.ts` | The allow-list, token handling and error mapping. |
 | `tests/validate.test.ts`, `format.test.ts` | Amount validation and exact formatting. |
@@ -310,7 +303,7 @@ frontend/
     api/[...path]/route.ts    token-holding proxy to the Rust API
   components/
     decoder/                  anatomy, fields, checks, verdict banner
-    node/                     dashboard, channels, liquidity bar, send, receive, wallet, payments
+    node/                     dashboard, channels, channel allowance, send, receive, wallet, payments
     shell/                    header, theme and motion toggles, background
     ui/                       shadcn/ui primitives
   lib/
