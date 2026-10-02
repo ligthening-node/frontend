@@ -79,11 +79,18 @@ describe("channels", () => {
     expect(totalAllowedMsat("9007199254740993", "0", "0", "0")).toBe(BigInt("9007199254740993000") - BigInt(660_000));
   });
 
-  it("counts the unspendable leftover as zero", () => {
-    expect(spendableMsat("17340000")).toBe(BigInt("17340000"));
-    expect(spendableMsat("1000000")).toBe(BigInt("1000000"));
-    expect(spendableMsat("371000")).toBe(BigInt(0));
-    expect(spendableMsat("0")).toBe(BigInt(0));
+  it("counts the funder's unspendable leftover as zero, up to 3,000 sat or half a tiny channel", () => {
+    const total = BigInt("98340000");
+    expect(spendableMsat("17340000", total)).toBe(BigInt("17340000"));
+    expect(spendableMsat("3000000", total)).toBe(BigInt("3000000"));
+    // What was left on a real channel after the last payment: 2,557 sat, 2,257 sat, 371 sat.
+    expect(spendableMsat("2557000", total)).toBe(BigInt(0));
+    expect(spendableMsat("2257000", total)).toBe(BigInt(0));
+    expect(spendableMsat("371000", total)).toBe(BigInt(0));
+    expect(spendableMsat("0", total)).toBe(BigInt(0));
+    // A 3,000 sat channel can only move 1,340 sat, so the limit is half of that.
+    expect(spendableMsat("700000", BigInt("1340000"))).toBe(BigInt("700000"));
+    expect(spendableMsat("600000", BigInt("1340000"))).toBe(BigInt(0));
   });
 
   it("shows a fixed total while 'left to send' and 'left to receive' change, with no range bar", () => {
@@ -131,7 +138,8 @@ describe("channels", () => {
     expect(channelState(CHANNEL)).toBe("Still open");
     expect(channelState({ ...CHANNEL, outbound_msat: "0" })).toBe("Completed");
     expect(channelState({ ...CHANNEL, outbound_msat: "327000" })).toBe("Completed");
-    expect(channelState({ ...CHANNEL, outbound_msat: "1500000" })).toBe("Still open");
+    expect(channelState({ ...CHANNEL, outbound_msat: "2557000" })).toBe("Completed");
+    expect(channelState({ ...CHANNEL, outbound_msat: "3500000" })).toBe("Still open");
     expect(channelState({ ...CHANNEL, is_outbound: false, inbound_msat: "0" })).toBe("Completed");
     expect(channelState({ ...CHANNEL, is_outbound: false, outbound_msat: "0" })).toBe("Still open");
     expect(channelState({ ...CHANNEL, is_usable: false, is_channel_ready: false, confirmations: 2 })).toBe(

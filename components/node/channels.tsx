@@ -4,7 +4,7 @@ import { WaypointsIcon } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 
-import { ChannelAllowance, spendableMsat } from "@/components/node/channel-allowance";
+import { ChannelAllowance, leftToMove } from "@/components/node/channel-allowance";
 import { ApiErrorNotice } from "@/components/node/unreachable";
 import { InfoTip } from "@/components/decoder/info-tip";
 import { Badge } from "@/components/ui/badge";
@@ -330,7 +330,8 @@ export function isChannelCompleted(channel: ChannelView): boolean {
   if (!channel.is_channel_ready) {
     return false;
   }
-  return spendableMsat(channel.is_outbound ? channel.outbound_msat : channel.inbound_msat) === BigInt(0);
+  const left = leftToMove(channel);
+  return (channel.is_outbound ? left.send : left.receive) === BigInt(0);
 }
 
 export function channelState(channel: ChannelView): string {
