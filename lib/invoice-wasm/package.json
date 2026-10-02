@@ -1,0 +1,17 @@
+{
+  "name": "invoice-wasm",
+  "type": "module",
+  "description": "Browser build of invoice-core",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "invoice_wasm_bg.wasm",
+    "invoice_wasm.js",
+    "invoice_wasm.d.ts"
+  ],
+  "main": "invoice_wasm.js",
+  "types": "invoice_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
