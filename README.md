@@ -54,7 +54,7 @@ There is no range bar. Each channel shows three numbers instead:
 
 | Number | Meaning |
 |---|---|
-| **Total allowed to transact** | Everything the channel can move: what you can send plus what you can receive. For a 20,000 sat channel that is 17,340 sat, because reserves and the opening fee are held back. It stays the same while payments flow. |
+| **Total allowed to transact** | Fixed for the life of the channel: its size, minus 660 sat of anchor outputs, minus the reserve the funder keeps. A 1,000,000 sat channel is always 989,340 sat and a 20,000 sat channel always 18,340 sat. Payments never change it. |
 | **Left to send** | What is still on your side. It counts down sat by sat as you pay and reaches **0 sat** when the channel is used up. The last few hundred sat the funder can never spend show as 0. |
 | **Left to receive** | The same figure for the other side. Both numbers move in opposite directions, so when one node's "left to send" falls, the other node's rises. |
 
@@ -204,15 +204,17 @@ if (result.status === "ok") {
 
 ### Exact amounts, no floating point
 
-Millisatoshi values are strings and are handled as `bigint`, so nothing is lost beyond 2^53. The allowance is the sum of
-both sides, and the unspendable leftover counts as zero:
+Millisatoshi values are strings and are handled as `bigint`, so nothing is lost beyond 2^53. The total a channel may
+transact is fixed from its own settings (size, anchors, the funder's reserve), while the unspendable leftover counts as
+zero in "left to send":
 
 ```ts
 import { spendableMsat, totalAllowedMsat } from "@/components/node/channel-allowance";
 
-totalAllowedMsat("16927000", "413000");   // 17340000n  total allowed: 17,340 sat, fixed for the channel
-spendableMsat("8670000");                 // 8670000n   still left to send
-spendableMsat("371000");                  // 0n         the funder's unspendable leftover: used up
+// channel size 1,000,000 sat, funder reserve 10,000 sat: always 989,340 sat, whatever has been paid
+totalAllowedMsat("1000000", "10000", "964340000", "15000000");   // 989340000n
+spendableMsat("964340000");                                      // 964340000n  left to send
+spendableMsat("371000");                                         // 0n          the funder's leftover: used up
 ```
 
 ### Channel state

@@ -384,7 +384,7 @@ export function ChannelRow({
         <NodeName labels={labels} nodeId={channel.counterparty_node_id} />
         <span className="text-muted-foreground">{channel.is_outbound ? "(you opened it)" : "(they opened it)"}</span>
       </div>
-      <ChannelAllowance outboundMsat={channel.outbound_msat} inboundMsat={channel.inbound_msat} />
+      <ChannelAllowance channel={channel} />
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
         <dt className="text-muted-foreground">Channel id</dt>
         <dd className="flex items-start gap-1">
