@@ -27,13 +27,11 @@ export function spendableMsat(msat: string, totalMsat: bigint): bigint {
 const ANCHOR_OVERHEAD_MSAT = BigInt(660_000);
 
 /**
- * What the channel is allowed to move in total, fixed for the life of the channel: its size, minus
- * the anchor outputs, minus the reserve the funder must keep. A 1,000,000 sat channel is 989,340 sat
- * and a 20,000 sat channel is 18,340 sat, whatever has been paid since. The two sides' "left to send"
- * figures change as payments flow, and (because the other side's reserve is also held back) they add
- * up to a little less than this. Falls back to their sum when the reserve is not known.
+ * What can actually be moved between the two sides: the channel size minus the anchor outputs,
+ * minus the reserve the funder must keep. It is smaller than the capacity, because part of the
+ * channel is always held back, and it only sizes the leftover limit below.
  */
-export function totalAllowedMsat(
+export function spendableTotalMsat(
   capacitySat: string,
   funderReserveSat: string | null,
   outboundMsat: string,
@@ -46,10 +44,15 @@ export function totalAllowedMsat(
   return total > BigInt(0) ? total : BigInt(outboundMsat) + BigInt(inboundMsat);
 }
 
-/** The fixed total this channel may transact, from the channel itself. */
+/** The total this channel is allowed to transact: its capacity, fixed for the life of the channel. */
 export function channelTotalMsat(channel: ChannelView): bigint {
+  return BigInt(channel.capacity_sat) * BigInt(1000);
+}
+
+/** What can really move between the two sides (see `spendableTotalMsat`). */
+function channelSpendableTotalMsat(channel: ChannelView): bigint {
   const funderReserve = channel.is_outbound ? channel.our_reserve_sat : channel.their_reserve_sat;
-  return totalAllowedMsat(channel.capacity_sat, funderReserve, channel.outbound_msat, channel.inbound_msat);
+  return spendableTotalMsat(channel.capacity_sat, funderReserve, channel.outbound_msat, channel.inbound_msat);
 }
 
 /**
@@ -58,35 +61,68 @@ export function channelTotalMsat(channel: ChannelView): bigint {
  * receive" are the figures that run down to 0 sat when the channel is used up.
  */
 export function leftToMove(channel: ChannelView): { send: bigint; receive: bigint } {
-  const total = channelTotalMsat(channel);
+  const total = channelSpendableTotalMsat(channel);
   return {
     send: channel.is_outbound ? spendableMsat(channel.outbound_msat, total) : BigInt(channel.outbound_msat),
     receive: channel.is_outbound ? BigInt(channel.inbound_msat) : spendableMsat(channel.inbound_msat, total),
   };
 }
 
+export interface Progress {
+  /** The capacity: what the channel is allowed to transact in total. */
+  total: bigint;
+  /** Sats that have moved to the other side so far. 0 on a new channel. */
+  transacted: bigint;
+  /** `total - transacted`: equal to the capacity on a new channel, 0 once the channel is completed. */
+  left: bigint;
+}
+
 /**
- * The channel's transaction allowance as numbers, with no bar: the fixed total it may transact, and
- * how much is still left to send and to receive. Those two change in real time as payments go out
- * and come in; the funder's side reaches 0 sat when the channel is used up.
+ * How much of the capacity has been transacted. The funder holds all the money at the start, so what
+ * has moved is what the funder can no longer send, and both nodes read it the same way: from the
+ * funder's own balance, or from the other side's inbound figure, which is the same amount. Once the
+ * funder has nothing spendable left, the part the channel holds back (reserves and fees) counts as
+ * used too, so the channel ends at exactly 0 left.
+ */
+export function transactionProgress(channel: ChannelView): Progress {
+  const total = channelTotalMsat(channel);
+  const spendable = channelSpendableTotalMsat(channel);
+  const funderLeft = BigInt(channel.is_outbound ? channel.outbound_msat : channel.inbound_msat);
+  if (funderLeft < unspendableLimitMsat(spendable)) {
+    return { total, transacted: total, left: BigInt(0) };
+  }
+  const moved = spendable - funderLeft;
+  const transacted = moved < BigInt(0) ? BigInt(0) : moved > total ? total : moved;
+  return { total, transacted, left: total - transacted };
+}
+
+/**
+ * The channel's transaction allowance as numbers, with no bar. It starts with the capacity as the
+ * total and as what is left to transact, then "transacted" grows and "left" falls to 0 sat as
+ * payments move sats; left to send and left to receive follow each side's balance in real time.
  */
 export function ChannelAllowance({ channel }: { channel: ChannelView }): ReactElement {
-  const total = channelTotalMsat(channel);
+  const progress = transactionProgress(channel);
   const left = leftToMove(channel);
+  const cells: [string, bigint][] = [
+    ["Capacity", progress.total],
+    ["Transacted so far", progress.transacted],
+    ["Left to transact", progress.left],
+    ["Left to send", left.send],
+    ["Left to receive", left.receive],
+  ];
   return (
-    <dl className="grid grid-cols-3 gap-3 rounded-lg bg-muted/50 p-3 text-xs" data-testid="channel-allowance">
-      <div className="flex flex-col gap-0.5">
-        <dt className="text-muted-foreground">Total allowed to transact</dt>
-        <dd className="text-sm font-medium tabular-nums">{formatMsat(total.toString())}</dd>
-      </div>
-      <div className="flex flex-col gap-0.5">
-        <dt className="text-muted-foreground">Left to send</dt>
-        <dd className="text-sm font-medium tabular-nums">{formatMsat(left.send.toString())}</dd>
-      </div>
-      <div className="flex flex-col gap-0.5">
-        <dt className="text-muted-foreground">Left to receive</dt>
-        <dd className="text-sm font-medium tabular-nums">{formatMsat(left.receive.toString())}</dd>
-      </div>
+    <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted/50 p-3 text-xs sm:grid-cols-5" data-testid="channel-allowance">
+      {cells.map(([label, msat]: [string, bigint]) => (
+        <div key={label} className="flex flex-col gap-0.5">
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd className="text-sm font-medium tabular-nums">{formatMsat(msat.toString())}</dd>
+        </div>
+      ))}
+      <p className="col-span-2 text-muted-foreground sm:col-span-5">
+        Part of the capacity (reserves and fees) is held back and can never be sent. It counts as used once the channel is
+        completed, when left to transact reaches 0.
+      </p>
     </dl>
   );
 }

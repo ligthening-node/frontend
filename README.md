@@ -50,13 +50,20 @@ A Next.js web app for learning and driving the Lightning Network on **regtest**.
 | **Confirming 2/6** | The funding transaction needs 6 confirmations. |
 | **Peer offline** | The channel is ready but the peer is not connected. |
 
-There is no range bar. Each channel shows three numbers instead:
+There is no range bar. Each channel shows five numbers instead:
 
 | Number | Meaning |
 |---|---|
-| **Total allowed to transact** | Fixed for the life of the channel: its size, minus 660 sat of anchor outputs, minus the reserve the funder keeps. A 1,000,000 sat channel is always 989,340 sat and a 20,000 sat channel always 18,340 sat. Payments never change it. |
-| **Left to send** | What is still on your side. It counts down sat by sat as you pay and reaches **0 sat** when the channel is used up. The last few hundred sat the funder can never spend show as 0. |
-| **Left to receive** | The same figure for the other side. Both numbers move in opposite directions, so when one node's "left to send" falls, the other node's rises. |
+| **Capacity** | The total the channel is allowed to transact, fixed for its whole life: a 20,000 sat channel always shows 20,000 sat and a 1,000,000 sat channel 1,000,000 sat. Payments never change it. |
+| **Transacted so far** | Sats that have moved to the other side. It is 0 on a new channel and grows with each payment (and shrinks if sats are paid back). |
+| **Left to transact** | Capacity minus transacted. It equals the capacity on a new channel and counts down to **0 sat**, at which point the channel is **Completed**. |
+| **Left to send** | What is still on your side. It counts down as you pay. The last few hundred sat the funder can never send show as 0. |
+| **Left to receive** | The same figure for the other side. When one node's "left to send" falls, the other node's "left to receive" rises. |
+
+For example, a new 20,000 sat channel starts with 20,000 sat left to transact. After 10,000 sat has been paid, 10,000 sat is
+transacted and 10,000 sat is left. Part of the capacity (the reserves each side keeps and the anchor fees) is held back and
+can never be sent, so "left to send" plus "left to receive" add up to a little less than the capacity. That held-back part
+counts as used once the channel is completed, so "left to transact" ends at exactly 0.
 
 ## Architecture
 
@@ -205,16 +212,14 @@ if (result.status === "ok") {
 ### Exact amounts, no floating point
 
 Millisatoshi values are strings and are handled as `bigint`, so nothing is lost beyond 2^53. The total a channel may
-transact is fixed from its own settings (size, anchors, the funder's reserve), while the unspendable leftover counts as
-zero in "left to send":
+transact is its capacity, and the unspendable leftover on the funder's side counts as zero in "left to send":
 
 ```ts
-import { spendableMsat, totalAllowedMsat } from "@/components/node/channel-allowance";
+import { channelTotalMsat, spendableMsat } from "@/components/node/channel-allowance";
 
-// channel size 1,000,000 sat, funder reserve 10,000 sat: always 989,340 sat, whatever has been paid
-totalAllowedMsat("1000000", "10000", "964340000", "15000000");   // 989340000n
-spendableMsat("964340000");                                      // 964340000n  left to send
-spendableMsat("371000");                                         // 0n          the funder's leftover: used up
+channelTotalMsat(channel);                       // 20000000n for a 20,000 sat channel, whatever has been paid
+spendableMsat("964340000", spendableTotal);      // 964340000n  left to send
+spendableMsat("371000", spendableTotal);         // 0n          the funder's leftover: used up
 ```
 
 ### Channel state

@@ -5,7 +5,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ChannelRow, channelState, sortChannels } from "@/components/node/channels";
-import { spendableMsat, totalAllowedMsat } from "@/components/node/channel-allowance";
+import {
+  channelTotalMsat,
+  spendableMsat,
+  spendableTotalMsat,
+  transactionProgress,
+} from "@/components/node/channel-allowance";
 import { describeEvent } from "@/components/node/live-events";
 import { Payments } from "@/components/node/payments";
 import { PayReview } from "@/components/node/send";
@@ -70,13 +75,19 @@ afterEach((): void => {
 // === Channels
 
 describe("channels", () => {
-  it("keeps the total allowed fixed: channel size minus anchors minus the funder's reserve", () => {
-    expect(totalAllowedMsat("1000000", "10000", "964340000", "15000000")).toBe(BigInt("989340000"));
-    expect(totalAllowedMsat("1000000", "10000", "989340000", "0")).toBe(BigInt("989340000"));
-    expect(totalAllowedMsat("20000", "1000", "0", "17340000")).toBe(BigInt("18340000"));
+  it("makes the total allowed equal the channel capacity, whatever has been paid", () => {
+    const channel = { ...CHANNEL, capacity_sat: "20000" };
+    expect(channelTotalMsat(channel)).toBe(BigInt("20000000"));
+    expect(channelTotalMsat({ ...channel, outbound_msat: "0", inbound_msat: "17340000" })).toBe(BigInt("20000000"));
+    expect(channelTotalMsat({ ...CHANNEL, capacity_sat: "1000000" })).toBe(BigInt("1000000000"));
+    expect(channelTotalMsat({ ...CHANNEL, capacity_sat: "9007199254740993" })).toBe(BigInt("9007199254740993000"));
+  });
+
+  it("works out what can really move (capacity minus anchors and the funder's reserve) for the leftover limit", () => {
+    expect(spendableTotalMsat("1000000", "10000", "964340000", "15000000")).toBe(BigInt("989340000"));
+    expect(spendableTotalMsat("20000", "1000", "0", "17340000")).toBe(BigInt("18340000"));
     // Without a known reserve it falls back to the sum of both sides.
-    expect(totalAllowedMsat("20000", null, "8000000", "9000000")).toBe(BigInt("17000000"));
-    expect(totalAllowedMsat("9007199254740993", "0", "0", "0")).toBe(BigInt("9007199254740993000") - BigInt(660_000));
+    expect(spendableTotalMsat("20000", null, "8000000", "9000000")).toBe(BigInt("17000000"));
   });
 
   it("counts the funder's unspendable leftover as zero, up to 3,000 sat or half a tiny channel", () => {
@@ -93,7 +104,27 @@ describe("channels", () => {
     expect(spendableMsat("600000", BigInt("1340000"))).toBe(BigInt(0));
   });
 
-  it("shows a fixed total while 'left to send' and 'left to receive' change, with no range bar", () => {
+  it("starts with left to transact equal to the capacity and counts it down to 0 as sats move", () => {
+    // The user's example: a 20,000 sat channel. 10,000 sat paid is exactly half.
+    const base = { ...CHANNEL, capacity_sat: "20000", our_reserve_sat: "1000", their_reserve_sat: "1000" };
+    const fresh = { ...base, outbound_msat: "18340000", inbound_msat: "0" };
+    const p = (c: typeof base): [string, string, string] => {
+      const r = transactionProgress(c);
+      return [r.total.toString(), r.transacted.toString(), r.left.toString()];
+    };
+    expect(p(fresh)).toEqual(["20000000", "0", "20000000"]);
+    expect(p({ ...base, outbound_msat: "8340000", inbound_msat: "9000000" })).toEqual(["20000000", "10000000", "10000000"]);
+    // The other node reads the same numbers from its own side.
+    const peerSide = { ...base, is_outbound: false, outbound_msat: "9000000", inbound_msat: "8340000" };
+    expect(p(peerSide)).toEqual(["20000000", "10000000", "10000000"]);
+    // Paying some back raises "left" again.
+    expect(p({ ...base, outbound_msat: "13340000", inbound_msat: "4000000" })).toEqual(["20000000", "5000000", "15000000"]);
+    // Used up: only the held-back leftover remains, so everything counts as transacted.
+    expect(p({ ...base, outbound_msat: "371000", inbound_msat: "16969000" })).toEqual(["20000000", "20000000", "0"]);
+    expect(p({ ...peerSide, inbound_msat: "371000", outbound_msat: "16969000" })).toEqual(["20000000", "20000000", "0"]);
+  });
+
+  it("shows the capacity as the total and as left to transact on a new channel, then counts down", () => {
     const channel = {
       ...CHANNEL,
       capacity_sat: "1000000",
@@ -105,19 +136,24 @@ describe("channels", () => {
     const { rerender } = render(<ChannelRow channel={channel} onClosed={(): void => {}} />);
     expect(screen.queryByRole("meter")).not.toBeInTheDocument();
     const box = (): HTMLElement => screen.getByTestId("channel-allowance");
-    expect(box()).toHaveTextContent("Total allowed to transact989,340 sat");
+    expect(box()).toHaveTextContent("Capacity1,000,000 sat");
+    expect(box()).toHaveTextContent("Transacted so far0 sat");
+    expect(box()).toHaveTextContent("Left to transact1,000,000 sat");
     expect(box()).toHaveTextContent("Left to send989,340 sat");
     expect(screen.getByText("Still open")).toBeInTheDocument();
 
-    // Payments flow: the total never moves, the other two do.
+    // 25,000 sat paid: the total stays, transacted grows, left falls.
     rerender(<ChannelRow channel={{ ...channel, outbound_msat: "964340000", inbound_msat: "15000000" }} onClosed={(): void => {}} />);
-    expect(box()).toHaveTextContent("Total allowed to transact989,340 sat");
-    expect(box()).toHaveTextContent("Left to send964,340 sat");
+    expect(box()).toHaveTextContent("Capacity1,000,000 sat");
+    expect(box()).toHaveTextContent("Transacted so far25,000 sat");
+    expect(box()).toHaveTextContent("Left to transact975,000 sat");
     expect(box()).toHaveTextContent("Left to receive15,000 sat");
 
-    // Used up: only an unspendable leftover remains, shown as 0.
+    // Used up: left to transact is exactly 0 and the channel is completed.
     rerender(<ChannelRow channel={{ ...channel, outbound_msat: "371000", inbound_msat: "978969000" }} onClosed={(): void => {}} />);
-    expect(box()).toHaveTextContent("Total allowed to transact989,340 sat");
+    expect(box()).toHaveTextContent("Capacity1,000,000 sat");
+    expect(box()).toHaveTextContent("Transacted so far1,000,000 sat");
+    expect(box()).toHaveTextContent("Left to transact0 sat");
     expect(box()).toHaveTextContent("Left to send0 sat");
     expect(screen.getByText("Completed")).toBeInTheDocument();
   });
