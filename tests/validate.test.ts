@@ -43,15 +43,16 @@ describe("addressError", () => {
 
 describe("channel forms", () => {
   it("checks capacity, push, node id and host:port", () => {
-    expect(channelCapacityError("1000", "1000000")).toContain("at least 5,000");
+    expect(channelCapacityError("100", "1000000")).toContain("at least 500");
+    expect(channelCapacityError("500", "1000000")).toBeNull();
     expect(channelCapacityError("5000", "1000000")).toBeNull();
     expect(channelCapacityError("5000000", "1000000")).toContain("available");
     expect(channelCapacityError("500000", "1000000")).toBeNull();
     expect(pushError("500000", "500000")).toContain("smaller");
     expect(pushError("100", "500000")).toBeNull();
     expect(pushError("", "500000")).toBeNull();
-    expect(pushError("3000", "5000")).toContain("at least 2,500");
-    expect(pushError("2500", "5000")).toBeNull();
+    expect(pushError("4600", "5000")).toContain("at least 500");
+    expect(pushError("4500", "5000")).toBeNull();
     expect(nodeIdError("039355eb")).not.toBeNull();
     expect(nodeIdError(PUBKEY)).toBeNull();
     expect(hostPortError("127.0.0.1")).not.toBeNull();

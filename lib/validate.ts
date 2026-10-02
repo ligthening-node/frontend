@@ -4,12 +4,13 @@ import { MIN_ONCHAIN_SAT } from "@/lib/format";
 // === Limits
 
 /**
- * Smallest channel the node can open. Opening costs about 1,100 sat (the first commitment fee plus
- * the anchor outputs), so anything near that fails inside the node with no useful message.
+ * Smallest channel the form accepts. The node itself needs about 3,000 sat for a channel that can
+ * carry a payment (the opening fee plus the reserve each side keeps), so smaller ones may still be
+ * refused by the node, which then says why.
  */
-export const MIN_CHANNEL_SAT = 5000;
-/** What must stay on the opener's side after the push, to cover the opening costs with margin. */
-export const MIN_OUR_SIDE_SAT = 2500;
+export const MIN_CHANNEL_SAT = 500;
+/** What must stay on the opener's side after the push. */
+export const MIN_OUR_SIDE_SAT = 500;
 /** BOLT11 caps the description at 639 bytes. */
 export const MAX_DESCRIPTION_LEN = 639;
 const MAX_EXPIRY_SECS = 31_536_000;
