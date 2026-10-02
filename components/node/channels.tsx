@@ -61,7 +61,7 @@ export function Channels(): ReactElement {
               <p className="text-sm text-muted-foreground">Connect to a peer, then open a channel with it.</p>
             </div>
           )}
-          {(channels.data ?? []).map((channel: ChannelView) => (
+          {sortChannels(channels.data ?? []).map((channel: ChannelView) => (
             <ChannelRow key={channel.user_channel_id} channel={channel} labels={labels} onClosed={refresh} />
           ))}
         </CardContent>
@@ -313,6 +313,18 @@ function OpenChannelCard({ onOpened, spendableSat }: { onOpened: () => void; spe
 
 // === Channel row
 
+/**
+ * Oldest channel first, newest last. The node returns channels in no fixed order, so without this a
+ * new channel could shuffle the rows and put a different channel under a "Completed" badge.
+ * Confirmations only grow, so the order of older channels never changes; unconfirmed ones go last.
+ */
+export function sortChannels(channels: ChannelView[]): ChannelView[] {
+  return [...channels].sort((a: ChannelView, b: ChannelView): number => {
+    const byAge = (b.confirmations ?? -1) - (a.confirmations ?? -1);
+    return byAge !== 0 ? byAge : a.channel_id.localeCompare(b.channel_id);
+  });
+}
+
 /** True once the whole amount has moved to the other side: nothing spendable is left to send (or to receive). */
 export function isChannelCompleted(channel: ChannelView): boolean {
   if (!channel.is_channel_ready) {
@@ -372,7 +384,11 @@ export function ChannelRow({
         <NodeName labels={labels} nodeId={channel.counterparty_node_id} />
         <span className="text-muted-foreground">{channel.is_outbound ? "(you opened it)" : "(they opened it)"}</span>
       </div>
-      <LiquidityBar outboundMsat={channel.outbound_msat} inboundMsat={channel.inbound_msat} />
+      <LiquidityBar
+        outboundMsat={channel.outbound_msat}
+        inboundMsat={channel.inbound_msat}
+        completed={isChannelCompleted(channel)}
+      />
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
         <dt className="text-muted-foreground">Channel id</dt>
         <dd className="flex items-start gap-1">

@@ -42,37 +42,50 @@ export function balancePercent(outboundMsat: string, inboundMsat: string): numbe
  * A range bar for one channel: full when the channel is new, emptying as sats are sent and filling
  * on the other node as they arrive. The two bars (one per node) always move in opposite directions.
  */
-export function LiquidityBar({ outboundMsat, inboundMsat }: { outboundMsat: string; inboundMsat: string }): ReactElement {
+export function LiquidityBar({
+  outboundMsat,
+  inboundMsat,
+  completed = false,
+}: {
+  outboundMsat: string;
+  inboundMsat: string;
+  /** A completed channel has nothing left to move, so the bar is not drawn; only the amounts stay. */
+  completed?: boolean;
+}): ReactElement {
   const percent = balancePercent(outboundMsat, inboundMsat);
   const totalMsat = (BigInt(outboundMsat) + BigInt(inboundMsat)).toString();
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="text-muted-foreground">Channel balance</span>
-        <span className="font-medium tabular-nums">{percent}%</span>
-      </div>
-      <div
-        role="meter"
-        aria-label="Our share of the channel"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        className="relative h-3 w-full rounded-full bg-muted"
-      >
-        <div
-          className="h-full origin-left rounded-full bg-primary transition-transform duration-500 ease-out-strong"
-          style={{ width: "100%", transform: `scaleX(${percent / 100})` }}
-        />
-        <div
-          aria-hidden
-          className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary shadow transition-[left] duration-500 ease-out-strong"
-          style={{ left: `${Math.min(97, Math.max(3, percent))}%` }}
-        />
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>0 sat</span>
-        <span>{formatMsat(totalMsat)}</span>
-      </div>
+      {!completed && (
+        <>
+          <div className="flex items-baseline justify-between text-xs">
+            <span className="text-muted-foreground">Channel balance</span>
+            <span className="font-medium tabular-nums">{percent}%</span>
+          </div>
+          <div
+            role="meter"
+            aria-label="Our share of the channel"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+            className="relative h-3 w-full rounded-full bg-muted"
+          >
+            <div
+              className="h-full origin-left rounded-full bg-primary transition-transform duration-500 ease-out-strong"
+              style={{ width: "100%", transform: `scaleX(${percent / 100})` }}
+            />
+            <div
+              aria-hidden
+              className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary shadow transition-[left] duration-500 ease-out-strong"
+              style={{ left: `${Math.min(97, Math.max(3, percent))}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>0 sat</span>
+            <span>{formatMsat(totalMsat)}</span>
+          </div>
+        </>
+      )}
       <div className="flex justify-between text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span aria-hidden className="size-2 rounded-full bg-primary" />

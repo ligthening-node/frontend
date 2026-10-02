@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { ChannelRow, channelState } from "@/components/node/channels";
+import { ChannelRow, channelState, sortChannels } from "@/components/node/channels";
 import { balancePercent, localPercent } from "@/components/node/liquidity-bar";
 import { describeEvent } from "@/components/node/live-events";
 import { Payments } from "@/components/node/payments";
@@ -86,6 +86,27 @@ describe("channels", () => {
     expect(balancePercent("0", "0")).toBe(0);
     // The last few hundred sat of the funder cannot be spent: that counts as fully used.
     expect(balancePercent("327000", "17013000")).toBe(0);
+  });
+
+  it("hides the range bar on a completed channel and keeps it on an open one", () => {
+    const { rerender } = render(<ChannelRow channel={CHANNEL} onClosed={(): void => {}} />);
+    expect(screen.getByRole("meter")).toBeInTheDocument();
+    rerender(<ChannelRow channel={{ ...CHANNEL, outbound_msat: "327000" }} onClosed={(): void => {}} />);
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.queryByRole("meter")).not.toBeInTheDocument();
+    expect(screen.getByText(/Can send 327 sat/)).toBeInTheDocument();
+  });
+
+  it("keeps channels in a fixed order, oldest first, when a new one appears", () => {
+    const old = { ...CHANNEL, channel_id: "bb", user_channel_id: "1", confirmations: 40 };
+    const mid = { ...CHANNEL, channel_id: "aa", user_channel_id: "2", confirmations: 12 };
+    const pending = { ...CHANNEL, channel_id: "cc", user_channel_id: "3", confirmations: null };
+    const ids = (list: (typeof CHANNEL)[]): string[] => sortChannels(list).map((c): string => c.user_channel_id);
+    expect(ids([pending, mid, old])).toEqual(["1", "2", "3"]);
+    expect(ids([old, pending, mid])).toEqual(["1", "2", "3"]);
+    // Same age: the channel id breaks the tie, so the order never depends on what the node returned.
+    const twin = { ...mid, channel_id: "ab", user_channel_id: "4" };
+    expect(ids([twin, mid])).toEqual(ids([mid, twin]));
   });
 
   it("names the channel state", () => {
