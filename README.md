@@ -33,7 +33,7 @@ A Next.js web app for learning and driving the Lightning Network on **regtest**.
 |---|---|
 | **In-browser decoder** | Paste a BOLT11 invoice and see a color-coded anatomy, every field explained, and a list of checks with a clear verdict. |
 | **Dashboard** | Node status, on-chain and Lightning balances, and live notifications for payments and channel changes. |
-| **Channels** | Open and close channels. Each channel shows its state and the total it is allowed to transact, with how much is left to send and receive. |
+| **Channels** | Open and close channels. A channel can only be opened with a peer that is connected right now: the form shows "Not connected to this peer" or "This peer is disconnected" and keeps the button disabled. Each channel shows its state and the total it is allowed to transact, with how much is left to send and receive. |
 | **Send** | Paste an invoice, review it, then pay. The app explains in words why a payment cannot go out. |
 | **Receive** | Create an invoice with an amount, description and expiry, shown as text and a QR code. |
 | **Wallet** | Get an on-chain address and send on-chain. |

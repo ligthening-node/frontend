@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { PeerView } from "@/lib/types/PeerView";
 import {
   addressError,
   channelCapacityError,
@@ -9,6 +10,7 @@ import {
   invoiceAmountError,
   nodeIdError,
   onchainSendError,
+  peerConnectionError,
   pushError,
 } from "@/lib/validate";
 
@@ -70,5 +72,34 @@ describe("invoice form", () => {
     expect(expiryError("99999999999")).toContain("one year");
     expect(descriptionError("a".repeat(640))).toContain("639");
     expect(descriptionError("book")).toBeNull();
+  });
+});
+
+describe("peerConnectionError", () => {
+  const peer = (is_connected: boolean): PeerView => ({
+    node_id: PUBKEY,
+    address: "127.0.0.1:9736",
+    is_connected,
+    is_persisted: true,
+  });
+
+  it("lets a channel open only with a peer that is connected right now", () => {
+    expect(peerConnectionError(PUBKEY, [peer(true)])).toBeNull();
+    expect(peerConnectionError(PUBKEY.toUpperCase(), [peer(true)])).toBeNull();
+    expect(peerConnectionError(`  ${PUBKEY}  `, [peer(true)])).toBeNull();
+  });
+
+  it("refuses a peer that was never connected", () => {
+    expect(peerConnectionError(PUBKEY, [])).toContain("Not connected to this peer");
+    expect(peerConnectionError(`03${"cd".repeat(32)}`, [peer(true)])).toContain("Not connected to this peer");
+  });
+
+  it("refuses a peer that is listed but disconnected", () => {
+    expect(peerConnectionError(PUBKEY, [peer(false)])).toContain("disconnected");
+  });
+
+  it("stays quiet while the id is empty or malformed, since those have their own messages", () => {
+    expect(peerConnectionError("", [])).toBeNull();
+    expect(peerConnectionError("039355eb", [])).toBeNull();
   });
 });

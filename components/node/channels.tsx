@@ -21,7 +21,7 @@ import type { ChannelView } from "@/lib/types/ChannelView";
 import type { PeerView } from "@/lib/types/PeerView";
 import { useAction } from "@/lib/use-action";
 import { usePoll } from "@/lib/use-poll";
-import { channelCapacityError, hostPortError, nodeIdError, pushError } from "@/lib/validate";
+import { channelCapacityError, hostPortError, nodeIdError, peerConnectionError, pushError } from "@/lib/validate";
 
 const POLL_MS = 5000;
 const LABELS_POLL_MS = 30000;
@@ -44,7 +44,11 @@ export function Channels(): ReactElement {
       {error !== null && <ApiErrorNotice error={error} />}
       <div className="grid gap-6 lg:grid-cols-2">
         <PeerCard peers={peers.data ?? []} labels={labels} onChange={refresh} />
-        <OpenChannelCard onOpened={refresh} spendableSat={balances.data?.onchain_spendable_sat ?? null} />
+        <OpenChannelCard
+          onOpened={refresh}
+          spendableSat={balances.data?.onchain_spendable_sat ?? null}
+          peers={peers.data ?? []}
+        />
       </div>
       <Card>
         <CardHeader>
@@ -200,7 +204,15 @@ function PeerCard({
 
 // === Open
 
-function OpenChannelCard({ onOpened, spendableSat }: { onOpened: () => void; spendableSat: string | null }): ReactElement {
+function OpenChannelCard({
+  onOpened,
+  spendableSat,
+  peers,
+}: {
+  onOpened: () => void;
+  spendableSat: string | null;
+  peers: PeerView[];
+}): ReactElement {
   const [nodeId, setNodeId] = useState<string>("");
   const [address, setAddress] = useState<string>("");
   const [amountSat, setAmountSat] = useState<string>("1000000");
@@ -208,6 +220,7 @@ function OpenChannelCard({ onOpened, spendableSat }: { onOpened: () => void; spe
   const action = useAction();
 
   const idError = nodeIdError(nodeId);
+  const connectionError = peerConnectionError(nodeId, peers);
   const addrError = hostPortError(address);
   const amountError = channelCapacityError(amountSat, spendableSat);
   const pushErr = pushError(pushSat, amountSat);
@@ -240,11 +253,11 @@ function OpenChannelCard({ onOpened, spendableSat }: { onOpened: () => void; spe
             <Input
               id="open-id"
               value={nodeId}
-              aria-invalid={idError !== null}
+              aria-invalid={idError !== null || connectionError !== null}
               onChange={(e): void => setNodeId(e.target.value)}
               className="font-mono"
             />
-            <FieldError message={idError} />
+            <FieldError message={idError ?? connectionError} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="open-address">Peer address</Label>
@@ -299,6 +312,7 @@ function OpenChannelCard({ onOpened, spendableSat }: { onOpened: () => void; spe
                 nodeId.trim() === "" ||
                 address.trim() === "" ||
                 idError !== null ||
+                connectionError !== null ||
                 addrError !== null
               }
             >

@@ -1,5 +1,6 @@
 import { isValidPubkey } from "@/components/decoder/context-options";
 import { MIN_ONCHAIN_SAT } from "@/lib/format";
+import type { PeerView } from "@/lib/types/PeerView";
 
 // === Limits
 
@@ -75,6 +76,24 @@ export function pushError(push: string, capacity: string): string | null {
     return `Leave at least ${MIN_OUR_SIDE_SAT.toLocaleString("en-US")} sat on your side to cover the opening fee.`;
   }
   return null;
+}
+
+// === Peer connection
+
+/**
+ * Why a channel cannot be opened with `nodeId` yet: the peer must be connected right now. Null when
+ * it is, or while the id is still empty or malformed (those have their own messages).
+ */
+export function peerConnectionError(nodeId: string, peers: PeerView[]): string | null {
+  const id = nodeId.trim().toLowerCase();
+  if (id === "" || !isValidPubkey(id)) {
+    return null;
+  }
+  const peer = peers.find((p: PeerView): boolean => p.node_id.toLowerCase() === id);
+  if (peer === undefined) {
+    return "Not connected to this peer. Connect to it in the Peers card first.";
+  }
+  return peer.is_connected ? null : "This peer is disconnected. Reconnect to it in the Peers card first.";
 }
 
 // === Addresses and peers
