@@ -5,13 +5,13 @@ import type { PeerView } from "@/lib/types/PeerView";
 // === Limits
 
 /**
- * Smallest channel the form accepts. The node itself needs about 3,000 sat for a channel that can
- * carry a payment (the opening fee plus the reserve each side keeps), so smaller ones may still be
- * refused by the node, which then says why.
+ * Smallest channel that can work. The peer needs a 1,000 sat reserve on each side after the opening
+ * costs (about 500 sat for the first commitment plus 660 sat of anchors), so 500, 1,000 and 2,000 sat
+ * were all opened and then closed by the peer. 2,300 sat was the smallest size that became usable.
  */
-export const MIN_CHANNEL_SAT = 500;
-/** What must stay on the opener's side after the push. */
-export const MIN_OUR_SIDE_SAT = 500;
+export const MIN_CHANNEL_SAT = 2300;
+/** What must stay on the opener's side after the push, to cover the same costs. */
+export const MIN_OUR_SIDE_SAT = 2300;
 /** BOLT11 caps the description at 639 bytes. */
 export const MAX_DESCRIPTION_LEN = 639;
 const MAX_EXPIRY_SECS = 31_536_000;
@@ -53,7 +53,11 @@ export function onchainSendError(input: string, spendableSat: string | null): st
 
 /** Channel capacity: at least MIN_CHANNEL_SAT, and no more than the spendable balance. */
 export function channelCapacityError(input: string, spendableSat: string | null): string | null {
-  return satAmountError(input, MIN_CHANNEL_SAT, spendableSat === null ? null : BigInt(spendableSat));
+  const error = satAmountError(input, MIN_CHANNEL_SAT, spendableSat === null ? null : BigInt(spendableSat));
+  if (error !== null && error.startsWith("Must be at least")) {
+    return `Must be at least ${MIN_CHANNEL_SAT.toLocaleString("en-US")} sat: each side keeps a 1,000 sat reserve and opening costs about 1,160 sat, so a smaller channel is closed by the peer.`;
+  }
+  return error;
 }
 
 /** Push amount: optional, and it must leave enough on your side to pay the channel's opening costs. */

@@ -45,16 +45,19 @@ describe("addressError", () => {
 
 describe("channel forms", () => {
   it("checks capacity, push, node id and host:port", () => {
-    expect(channelCapacityError("100", "1000000")).toContain("at least 500");
-    expect(channelCapacityError("500", "1000000")).toBeNull();
+    // 500, 1,000 and 2,000 sat were all closed by the peer, so they are refused up front.
+    for (const tooSmall of ["100", "500", "1000", "2000", "2299"]) {
+      expect(channelCapacityError(tooSmall, "1000000")).toContain("at least 2,300 sat");
+    }
+    expect(channelCapacityError("2300", "1000000")).toBeNull();
     expect(channelCapacityError("5000", "1000000")).toBeNull();
     expect(channelCapacityError("5000000", "1000000")).toContain("available");
     expect(channelCapacityError("500000", "1000000")).toBeNull();
     expect(pushError("500000", "500000")).toContain("smaller");
     expect(pushError("100", "500000")).toBeNull();
     expect(pushError("", "500000")).toBeNull();
-    expect(pushError("4600", "5000")).toContain("at least 500");
-    expect(pushError("4500", "5000")).toBeNull();
+    expect(pushError("2800", "5000")).toContain("at least 2,300");
+    expect(pushError("2700", "5000")).toBeNull();
     expect(nodeIdError("039355eb")).not.toBeNull();
     expect(nodeIdError(PUBKEY)).toBeNull();
     expect(hostPortError("127.0.0.1")).not.toBeNull();

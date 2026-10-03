@@ -351,5 +351,17 @@ describe("live events", () => {
     );
     expect(describeEvent({ kind: "payments_changed" })).toBe("Payments updated");
     expect(describeEvent({ kind: "channel_closed", channel_id: "aa", reason: null })).toBe("Channel closed");
+    expect(describeEvent({ kind: "channel_closed", channel_id: "aa", reason: "peer went away" })).toBe(
+      "Channel closed: peer went away",
+    );
+    // The error the peer sends for a channel that is too small becomes advice.
+    const tooSmall = describeEvent({
+      kind: "channel_closed",
+      channel_id: "aa",
+      reason:
+        "Channel closed because counterparty force-closed with message: Suitable channel reserve not found. remote_channel_reserve was (1000000)msats. Channel value is (1000000 - 0)msats.",
+    });
+    expect(tooSmall).toContain("too small");
+    expect(tooSmall).toContain("at least 2,300 sat");
   });
 });

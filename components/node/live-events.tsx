@@ -29,6 +29,9 @@ export function describeEvent(event: NodeEvent): string {
     case "channel_ready":
       return "Channel is ready to use";
     case "channel_closed":
+      if (event.reason !== null && event.reason.includes("Suitable channel reserve not found")) {
+        return "Channel closed: the peer refused it because it is too small. Each side keeps a 1,000 sat reserve and opening costs about 1,160 sat, so open at least 2,300 sat.";
+      }
       return `Channel closed${event.reason === null ? "" : `: ${event.reason}`}`;
     case "payments_changed":
       return "Payments updated";
