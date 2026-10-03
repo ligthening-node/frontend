@@ -98,7 +98,7 @@ export function transactionProgress(channel: ChannelView): Progress {
 
 /**
  * The channel's transaction allowance as numbers, with no bar. It starts with the capacity as the
- * total and as what is left to transact, then "transacted" grows and "left" falls to 0 sat as
+ * total and as the remaining capacity, then "transacted" grows and "left" falls to 0 sat as
  * payments move sats; left to send and left to receive follow each side's balance in real time.
  */
 export function ChannelAllowance({ channel }: { channel: ChannelView }): ReactElement {
@@ -107,7 +107,7 @@ export function ChannelAllowance({ channel }: { channel: ChannelView }): ReactEl
   const cells: [string, bigint][] = [
     ["Capacity", progress.total],
     ["Transacted so far", progress.transacted],
-    ["Left to transact", progress.left],
+    ["Remaining capacity", progress.left],
     ["Left to send", left.send],
     ["Left to receive", left.receive],
   ];
@@ -121,7 +121,7 @@ export function ChannelAllowance({ channel }: { channel: ChannelView }): ReactEl
       ))}
       <p className="col-span-2 text-muted-foreground sm:col-span-5">
         Part of the capacity (reserves and fees) is held back and can never be sent. It counts as used once the channel is
-        completed, when left to transact reaches 0.
+        completed, when the remaining capacity reaches 0.
       </p>
     </dl>
   );

@@ -104,7 +104,7 @@ describe("channels", () => {
     expect(spendableMsat("600000", BigInt("1340000"))).toBe(BigInt(0));
   });
 
-  it("starts with left to transact equal to the capacity and counts it down to 0 as sats move", () => {
+  it("starts with the remaining capacity equal to the capacity and counts it down to 0 as sats move", () => {
     // The user's example: a 20,000 sat channel. 10,000 sat paid is exactly half.
     const base = { ...CHANNEL, capacity_sat: "20000", our_reserve_sat: "1000", their_reserve_sat: "1000" };
     const fresh = { ...base, outbound_msat: "18340000", inbound_msat: "0" };
@@ -124,7 +124,7 @@ describe("channels", () => {
     expect(p({ ...peerSide, inbound_msat: "371000", outbound_msat: "16969000" })).toEqual(["20000000", "20000000", "0"]);
   });
 
-  it("shows the capacity as the total and as left to transact on a new channel, then counts down", () => {
+  it("shows the capacity as the total and as the remaining capacity on a new channel, then counts down", () => {
     const channel = {
       ...CHANNEL,
       capacity_sat: "1000000",
@@ -138,7 +138,7 @@ describe("channels", () => {
     const box = (): HTMLElement => screen.getByTestId("channel-allowance");
     expect(box()).toHaveTextContent("Capacity1,000,000 sat");
     expect(box()).toHaveTextContent("Transacted so far0 sat");
-    expect(box()).toHaveTextContent("Left to transact1,000,000 sat");
+    expect(box()).toHaveTextContent("Remaining capacity1,000,000 sat");
     expect(box()).toHaveTextContent("Left to send989,340 sat");
     expect(screen.getByText("Still open")).toBeInTheDocument();
 
@@ -146,14 +146,14 @@ describe("channels", () => {
     rerender(<ChannelRow channel={{ ...channel, outbound_msat: "964340000", inbound_msat: "15000000" }} onClosed={(): void => {}} />);
     expect(box()).toHaveTextContent("Capacity1,000,000 sat");
     expect(box()).toHaveTextContent("Transacted so far25,000 sat");
-    expect(box()).toHaveTextContent("Left to transact975,000 sat");
+    expect(box()).toHaveTextContent("Remaining capacity975,000 sat");
     expect(box()).toHaveTextContent("Left to receive15,000 sat");
 
-    // Used up: left to transact is exactly 0 and the channel is completed.
+    // Used up: the remaining capacity is exactly 0 and the channel is completed.
     rerender(<ChannelRow channel={{ ...channel, outbound_msat: "371000", inbound_msat: "978969000" }} onClosed={(): void => {}} />);
     expect(box()).toHaveTextContent("Capacity1,000,000 sat");
     expect(box()).toHaveTextContent("Transacted so far1,000,000 sat");
-    expect(box()).toHaveTextContent("Left to transact0 sat");
+    expect(box()).toHaveTextContent("Remaining capacity0 sat");
     expect(box()).toHaveTextContent("Left to send0 sat");
     expect(screen.getByText("Completed")).toBeInTheDocument();
   });

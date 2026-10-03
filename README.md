@@ -56,14 +56,14 @@ There is no range bar. Each channel shows five numbers instead:
 |---|---|
 | **Capacity** | The total the channel is allowed to transact, fixed for its whole life: a 20,000 sat channel always shows 20,000 sat and a 1,000,000 sat channel 1,000,000 sat. Payments never change it. |
 | **Transacted so far** | Sats that have moved to the other side. It is 0 on a new channel and grows with each payment (and shrinks if sats are paid back). |
-| **Left to transact** | Capacity minus transacted. It equals the capacity on a new channel and counts down to **0 sat**, at which point the channel is **Completed**. |
+| **Remaining capacity** | What the channel can still carry: capacity minus transacted. It equals the capacity on a new channel and counts down to **0 sat**, at which point the channel is **Completed**. |
 | **Left to send** | What is still on your side. It counts down as you pay. The last few hundred sat the funder can never send show as 0. |
 | **Left to receive** | The same figure for the other side. When one node's "left to send" falls, the other node's "left to receive" rises. |
 
-For example, a new 20,000 sat channel starts with 20,000 sat left to transact. After 10,000 sat has been paid, 10,000 sat is
-transacted and 10,000 sat is left. Part of the capacity (the reserves each side keeps and the anchor fees) is held back and
+For example, a new 20,000 sat channel starts with a remaining capacity of 20,000 sat. After 10,000 sat has been paid, 10,000 sat is
+transacted and the remaining capacity is 10,000 sat. Part of the capacity (the reserves each side keeps and the anchor fees) is held back and
 can never be sent, so "left to send" plus "left to receive" add up to a little less than the capacity. That held-back part
-counts as used once the channel is completed, so "left to transact" ends at exactly 0.
+counts as used once the channel is completed, so the remaining capacity ends at exactly 0.
 
 ## Architecture
 
