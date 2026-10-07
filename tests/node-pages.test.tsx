@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Dashboard } from "@/components/node/dashboard";
+import { Receive, receiveChannelProblem } from "@/components/node/receive";
 import { Send, channelSetupProblem } from "@/components/node/send";
 import { Wallet } from "@/components/node/wallet";
 
@@ -153,5 +154,72 @@ describe("channelSetupProblem", () => {
   it("asks for a channel when there is none, and for patience when none is usable", () => {
     expect(channelSetupProblem([])).toContain("no channel yet");
     expect(channelSetupProblem([waiting])).toContain("None of your channels is usable");
+  });
+});
+
+describe("Receive without a channel", () => {
+  const channel = (is_usable: boolean): object => ({
+    channel_id: "aa",
+    user_channel_id: "1",
+    counterparty_node_id: "02ab",
+    funding_txo: null,
+    short_channel_id: null,
+    capacity_sat: "20000",
+    outbound_msat: "18340000",
+    inbound_msat: "0",
+    max_send_msat: "17969000",
+    is_outbound: true,
+    is_channel_ready: is_usable,
+    is_usable,
+    confirmations: 6,
+    confirmations_required: 6,
+    our_balance_sat: "19056",
+    our_reserve_sat: "1000",
+    their_reserve_sat: "1000",
+  });
+
+  it("blocks creating an invoice and points to Channels when there is no channel", async () => {
+    stubApi({ channels: [] });
+    render(<Receive />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Create a channel first");
+    expect(alert).toHaveTextContent("You have no channel yet");
+    expect(screen.getByRole("link", { name: "Go to Channels" })).toHaveAttribute("href", "/channels");
+    expect(screen.getByRole("button", { name: "Create invoice" })).toBeDisabled();
+  });
+
+  it("blocks creating an invoice while the channel is not usable", async () => {
+    stubApi({ channels: [channel(false)] });
+    render(<Receive />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("None of your channels is usable yet");
+    expect(screen.getByRole("button", { name: "Create invoice" })).toBeDisabled();
+  });
+
+  it("allows creating an invoice once a channel is usable", async () => {
+    stubApi({ channels: [channel(true)] });
+    render(<Receive />);
+    await waitFor((): void => {
+      expect(vi.mocked(fetch).mock.calls.some((call): boolean => call[0] === "/api/channels")).toBe(true);
+    });
+    await new Promise((resolve): void => {
+      setTimeout(resolve, 50);
+    });
+    expect(screen.queryByText("Create a channel first")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create invoice" })).toBeEnabled();
+  });
+});
+
+describe("receiveChannelProblem", () => {
+  const usable = { is_usable: true } as never;
+  const waiting = { is_usable: false } as never;
+
+  it("is quiet while the channels are unknown or at least one is usable", () => {
+    expect(receiveChannelProblem(null)).toBeNull();
+    expect(receiveChannelProblem([waiting, usable])).toBeNull();
+  });
+
+  it("asks for a channel when there is none, and for patience when none is usable", () => {
+    expect(receiveChannelProblem([])).toContain("no channel yet");
+    expect(receiveChannelProblem([waiting])).toContain("None of your channels is usable");
   });
 });

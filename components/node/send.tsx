@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -9,6 +8,7 @@ import { isValidPubkey } from "@/components/decoder/context-options";
 import { DecodeErrorView } from "@/components/decoder/decode-error-view";
 import { InvoiceDetails } from "@/components/decoder/invoice-details";
 import { VerdictBanner } from "@/components/decoder/verdict-banner";
+import { ChannelRequiredNotice } from "@/components/node/channel-required-notice";
 import { FieldError } from "@/components/node/field-error";
 import { ApiErrorNotice } from "@/components/node/unreachable";
 import { PageHeader } from "@/components/shell/page-header";
@@ -165,15 +165,7 @@ export function Send(): ReactElement {
       {status.error !== null && <ApiErrorNotice error={status.error} />}
 
       {invoice.trim() !== "" && channelProblem !== null && (
-        <div role="alert" className="flex flex-col gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-          <p className="font-semibold">Create a channel first</p>
-          <p>{channelProblem}</p>
-          <div>
-            <Link href="/channels" className="font-medium underline underline-offset-4">
-              Go to Channels
-            </Link>
-          </div>
-        </div>
+        <ChannelRequiredNotice message={channelProblem} />
       )}
 
       {shown !== null && shown.result.status === "error" && (

@@ -4,20 +4,41 @@ import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 
+import { ChannelRequiredNotice } from "@/components/node/channel-required-notice";
 import { ApiErrorNotice } from "@/components/node/unreachable";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createInvoice } from "@/lib/api";
+import { createInvoice, getChannels } from "@/lib/api";
 import { FieldError } from "@/components/node/field-error";
 import { satInputToMsat } from "@/lib/format";
 import { descriptionError, expiryError, invoiceAmountError } from "@/lib/validate";
+import type { ChannelView } from "@/lib/types/ChannelView";
 import type { CreatedInvoice } from "@/lib/types/CreatedInvoice";
 import { useAction } from "@/lib/use-action";
+import { usePoll } from "@/lib/use-poll";
 
 const DEFAULT_EXPIRY_SECS = 3600;
+const CHANNELS_POLL_MS = 10000;
+
+/**
+ * Why no invoice can be created yet, or null when at least one channel is usable (or the channels
+ * are not known yet). Without a usable channel nobody can pay the invoice.
+ */
+export function receiveChannelProblem(channels: ChannelView[] | null): string | null {
+  if (channels === null) {
+    return null;
+  }
+  if (channels.length === 0) {
+    return "You have no channel yet. Create a channel first, then come back to create an invoice.";
+  }
+  if (!channels.some((c: ChannelView): boolean => c.is_usable)) {
+    return "None of your channels is usable yet: it is still confirming or the peer is offline. Wait for it, or create a new channel.";
+  }
+  return null;
+}
 
 export function Receive(): ReactElement {
   const [amountSat, setAmountSat] = useState<string>("");
@@ -25,12 +46,15 @@ export function Receive(): ReactElement {
   const [expiry, setExpiry] = useState<string>(String(DEFAULT_EXPIRY_SECS));
   const [created, setCreated] = useState<CreatedInvoice | null>(null);
   const action = useAction();
+  const channels = usePoll(getChannels, CHANNELS_POLL_MS);
+  const channelProblem = receiveChannelProblem(channels.data);
 
   const amountMsat = amountSat.trim() === "" ? null : satInputToMsat(amountSat);
   const amountError = invoiceAmountError(amountSat);
   const expiryErr = expiryError(expiry);
   const descriptionErr = descriptionError(description);
-  const formOk = amountError === null && expiryErr === null && descriptionErr === null;
+  const formOk =
+    channelProblem === null && amountError === null && expiryErr === null && descriptionErr === null;
 
   async function onSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -42,6 +66,7 @@ export function Receive(): ReactElement {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Receive" description="Create an invoice for someone to pay over Lightning." />
+      {channelProblem !== null && <ChannelRequiredNotice message={channelProblem} />}
       <Card>
         <CardHeader>
           <CardTitle>Create an invoice</CardTitle>
