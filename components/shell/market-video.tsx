@@ -6,8 +6,8 @@ import type { ReactElement } from "react";
 import { prefersSavingData, shouldPlayVideo } from "@/lib/market-video";
 
 /**
- * A soft, looping market-activity video behind the whole app at 30% opacity (candles, a trade
- * ticker and payment flows, all made up). It is decoration, so it never takes focus or input, and it
+ * A soft, looping video behind the whole app at 30% opacity (a flowing line chart and payment
+ * flows, all made up). It is decoration, so it never takes focus or input, and it
  * stays on its first frame when the user prefers reduced motion, paused the background motion, asked
  * the browser to save data, or switched to another tab.
  */
